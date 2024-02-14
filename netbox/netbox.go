@@ -11,7 +11,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/rsapc/webhooks/models"
+	"github.com/rsapc/hookcmd/models"
 )
 
 const region = 12

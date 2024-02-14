@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/rsapc/webhooks/models"
+	"github.com/rsapc/hookcmd/models"
 	"golang.org/x/exp/slog"
 )
 

@@ -7,9 +7,9 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/rsapc/webhooks/librenms"
-	"github.com/rsapc/webhooks/models"
-	"github.com/rsapc/webhooks/netbox"
+	"github.com/rsapc/hookcmd/librenms"
+	"github.com/rsapc/hookcmd/models"
+	"github.com/rsapc/hookcmd/netbox"
 )
 
 type Service struct {
