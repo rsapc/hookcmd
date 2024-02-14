@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/rsapc/webhooks/service"
+	"github.com/rsapc/hookcmd/service"
 	"github.com/spf13/cobra"
 )
 
