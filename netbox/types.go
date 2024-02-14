@@ -14,6 +14,16 @@ const (
 	WarningLevel
 )
 
+type MonitoringSearchResults struct {
+	Count    int         `json:"count"`
+	Next     interface{} `json:"next"`
+	Previous interface{} `json:"previous"`
+	Results  []struct {
+		ID  int64  `json:"id"`
+		URL string `json:"url"`
+	} `json:"results"`
+}
+
 // getObjectType returns the full netbox object type for the given model.
 // For example, given the type of "device" will return "dcim.device"
 func getObjectType(aModel string) string {

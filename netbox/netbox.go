@@ -1,6 +1,7 @@
 package netbox
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/rsapc/hookcmd/models"
 )
+
+var ErrNotFound = errors.New("the requested object was not found")
 
 const region = 12
 
@@ -301,6 +304,52 @@ func (c *Client) checkSite(param string, name string) (found bool, id int) {
 	return false, 0
 }
 
+// FindMonitoredObject searches for the device or VM that has the requested monitoring_id custom field.
+func (c *Client) FindMonitoredObject(monitoringID int) (objectType string, objectID int64, err error) {
+	id, err := c.FindMonitoredDevice(monitoringID)
+	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			return "device", -1, err
+		}
+	} else {
+		return "device", id, nil
+	}
+	id, err = c.FindMonitoredVM(monitoringID)
+	return "virtualmachine", id, err
+}
+
+// FindMonitoredDevice searches devices for the given monitoring_id custom field
+func (c *Client) FindMonitoredDevice(monitoringID int) (objectID int64, err error) {
+	return c.searchMonitoredID(monitoringID, GetPathForModel("device"))
+}
+
+// FindMonitoredVM searches virtual machines for the given monitoring_id custom field
+func (c *Client) FindMonitoredVM(monitoringID int) (objectID int64, err error) {
+	return c.searchMonitoredID(monitoringID, GetPathForModel("virtualmachine"))
+}
+
+func (c *Client) searchMonitoredID(monitoringID int, path string) (objectID int64, err error) {
+	obj := &MonitoringSearchResults{}
+	r := c.buildRequest().SetResult(obj)
+	url := c.buildURL(fmt.Sprintf("%s/?cf_monitoring_id=%d", path, monitoringID))
+	resp, err := r.Get(url)
+	if err != nil {
+		c.log.Error(fmt.Sprintf("error searching %s", r.URL), "err", err)
+		return objectID, err
+	}
+	if resp.IsError() {
+		c.log.Error(fmt.Sprintf("%d searching %s", resp.StatusCode(), r.URL), "err", err)
+		return objectID, err
+	}
+	if obj.Count == 0 {
+		return objectID, ErrNotFound
+	}
+	if obj.Count > 1 {
+		return objectID, fmt.Errorf("too many objects found: %d", obj.Count)
+	}
+	return obj.Results[0].ID, nil
+}
+
 func (c *Client) AddSite(row map[string]string) error {
 	var id int
 	var found bool
@@ -355,6 +404,16 @@ func (c *Client) AddSite(row map[string]string) error {
 }
 
 func (c *Client) UpdateCustomFieldOnModel(model string, modelID int64, field string, value any) error {
+	cf := make(map[string]interface{})
+	data := make(map[string]interface{})
+	cf[field] = value
+	data["custom_fields"] = cf
+
+	return c.UpdateObject(model, modelID, data)
+}
+
+// UpdateObject takes an object and updates it
+func (c *Client) UpdateObject(model string, modelID int64, payload map[string]interface{}) error {
 	path := GetPathForModel(model)
 	if path == "" {
 		c.log.Error("could not determine the path for model %s", model)
@@ -362,15 +421,10 @@ func (c *Client) UpdateCustomFieldOnModel(model string, modelID int64, field str
 	}
 	path = fmt.Sprintf("%s/%d/", path, modelID)
 
-	cf := make(map[string]interface{})
-	data := make(map[string]interface{})
-	cf[field] = value
-	data["custom_fields"] = cf
-
-	c.log.Debug(fmt.Sprintf("Adding %s %s to %s %d", field, value, model, modelID))
+	c.log.Debug(fmt.Sprintf("Updating %s %d", model, modelID))
 	obj := make(map[string]interface{})
 	r := c.buildRequest().SetResult(&obj)
-	r.SetBody(data)
+	r.SetBody(payload)
 	resp, err := r.Patch(c.buildURL(path))
 	if err != nil {
 		c.log.Warn(err.Error())

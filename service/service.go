@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -78,6 +79,53 @@ func (s *Service) AddToLibreNMS(addr string, model string, modelID int64) error 
 	} else {
 		msg := fmt.Sprintf("added monitoring_id %d to %s %d", devid, model, modelID)
 		s.netbox.AddJournalEntry(model, modelID, netbox.SuccessLevel, msg)
+	}
+	return nil
+}
+
+// DeviceDown will set the device status in Netbox based on the
+// state of the alert.  Payload is expected to be the JSON of
+// the alert.
+func (s *Service) DeviceDown(payload string) error {
+	var alert librenms.LibreAlert
+	err := json.Unmarshal(([]byte)(payload), &alert)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("could not decode alert payload: %v", err), "service", "service")
+		return err
+	}
+
+	objectType, objectID, err := s.netbox.FindMonitoredObject(alert.DeviceID)
+	if err != nil {
+		s.logger.Error(err.Error())
+		return err
+	}
+
+	var journalEntry = fmt.Sprintf(`%s
+	
+	%s status updated as of %s
+
+	%s`, alert.Subject, alert.SysName, alert.Timestamp, alert.Runbook)
+
+	data := make(map[string]interface{})
+	data["status"] = "offline"
+
+	switch alert.State {
+	case librenms.AlertFiring:
+		// if this is the first occurance of the alert
+		if alert.ID == alert.UID {
+			err = s.netbox.UpdateObject(objectType, objectID, data)
+			if err != nil {
+				return err
+			}
+			return s.netbox.AddJournalEntry(objectType, objectID, netbox.DangerLevel, journalEntry)
+		}
+	case librenms.AlertCleared:
+		data["status"] = "active"
+		err = s.netbox.UpdateObject(objectType, objectID, data)
+		if err != nil {
+			return err
+		}
+		return s.netbox.AddJournalEntry(objectType, objectID, netbox.SuccessLevel, journalEntry)
 	}
 	return nil
 }
