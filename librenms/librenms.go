@@ -1,6 +1,7 @@
 package librenms
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
@@ -53,8 +54,9 @@ func (c *Client) AddDevice(ip string) (deviceID int, err error) {
 		return deviceID, err
 	}
 	if resp.IsError() {
+		json.Unmarshal(resp.Body(), &obj)
 		errMsg := fmt.Sprintf("invalid response from server: %d.  %s", resp.StatusCode(), obj.Message)
-		c.log.Error(errMsg, "url", r.URL)
+		c.log.Error(errMsg, "url", r.URL, "body", string(resp.Body()))
 		return deviceID, fmt.Errorf("%s", errMsg)
 	}
 	if obj.Status == "ok" {
