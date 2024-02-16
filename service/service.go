@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 
@@ -218,4 +219,34 @@ func (s *Service) FindDevice(addr string) error {
 		return err
 	}
 	return err
+}
+
+// MissingFromLibre generates a report of Netbox devices that are not
+// in LibreNMS
+func (s *Service) MissingFromLibre(out io.Writer) error {
+	devices, err := s.netbox.SearchDeviceAndVM(
+		"status=active",
+		"has_primary_ip=true",
+		"cf_monitoring_id__lte=0")
+	if err != nil {
+		s.logger.Error("could not get list of netbox devices", "err", err)
+		return err
+	}
+	io.WriteString(out, "Name,IP\n")
+	for _, device := range devices {
+		port, err := s.librenms.FindPortForIP(device.PrimaryIP.Address)
+		if err != nil {
+			if errors.Is(err, librenms.ErrNotFound) {
+				io.WriteString(out, fmt.Sprintf("%s,%s\n", device.Name, netbox.IPfromCIDR(device.PrimaryIP.Address)))
+				continue
+			}
+			return err
+		}
+		libreDev, err := s.librenms.GetDevice(port.DeviceID)
+		if err != nil {
+			return err
+		}
+		s.updateNetboxDevice(libreDev, device)
+	}
+	return nil
 }

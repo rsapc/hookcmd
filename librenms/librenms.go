@@ -170,7 +170,7 @@ func (c *Client) LoadIPs() error {
 	return nil
 }
 
-func (c *Client) findPortForIP(ip string) (port Port, err error) {
+func (c *Client) FindPortForIP(ip string) (port Port, err error) {
 	found := false
 	if err := c.LoadIPs(); err != nil {
 		return port, err
@@ -192,7 +192,7 @@ func (c *Client) findPortForIP(ip string) (port Port, err error) {
 }
 
 func (c *Client) GetDeviceByIP(ip string) (device LibreDevice, err error) {
-	port, err := c.findPortForIP(ip)
+	port, err := c.FindPortForIP(ip)
 	if err != nil {
 		c.log.Error("could not find device for IP", "err", err)
 		return device, err

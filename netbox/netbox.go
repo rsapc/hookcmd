@@ -786,3 +786,71 @@ func (c *Client) GetTenant(id int) (*Tenant, error) {
 	return tenant, nil
 
 }
+
+// SearchDeviceAndVM searches both the devices and virtualmachines
+// endpoints for the given args.  Calls SearchDevices() and SearchVMs()
+// to get the results.
+//
+// Args should be specified as
+// key=value (eg. has_primary_ip=true)
+func (c *Client) SearchDeviceAndVM(args ...string) ([]DeviceOrVM, error) {
+	var devices []DeviceOrVM
+	devices, err := c.SearchDevices(args...)
+	if err != nil {
+		return nil, err
+	}
+	vms, err := c.SearchVMs(args...)
+	if err != nil {
+		return nil, err
+	}
+	devices = append(devices, vms...)
+	return devices, nil
+}
+
+// SearchDevices searches  the devices
+// endpoint for the given args.  Args should be specified as
+// key=value (eg. has_primary_ip=true)
+func (c *Client) SearchDevices(args ...string) ([]DeviceOrVM, error) {
+	return c.performDevVMsearch("device", args...)
+}
+
+// SearchVMs searches  the   virtualmachines
+// endpoint for the given args.  Args should be specified as
+// key=value (eg. has_primary_ip=true)
+func (c *Client) SearchVMs(args ...string) ([]DeviceOrVM, error) {
+	return c.performDevVMsearch("virtualmachine", args...)
+}
+
+// performDevVMsearch executes the search for devices or VMs
+func (c *Client) performDevVMsearch(objectType string, args ...string) ([]DeviceOrVM, error) {
+	var devices []DeviceOrVM
+	obj := DeviceVMSearchResults{}
+	r := c.buildRequest().SetResult(&obj)
+	path := GetPathForModel(objectType)
+	if path == "" {
+		c.log.Error("could not determine the path for model %s", objectType)
+		return devices, fmt.Errorf("could not determine the path for model %s", objectType)
+	}
+	var queryArgs string
+	concat := ""
+	for _, arg := range args {
+		queryArgs = fmt.Sprintf("%s%s%s", queryArgs, concat, arg)
+		concat = "&"
+	}
+	initalURL := c.buildURL(path+"/?%s", queryArgs)
+	url := &initalURL
+	for url != nil {
+		resp, err := r.Get(*url)
+		if err != nil {
+			c.log.Error(fmt.Sprintf("error searching %s", r.URL), "err", err)
+			return devices, err
+		}
+		if resp.IsError() {
+			c.log.Error(fmt.Sprintf("%d searching %s", resp.StatusCode(), r.URL), "err", err)
+			return devices, err
+		}
+		devices = append(devices, obj.Results...)
+		url = obj.Next
+	}
+	return devices, nil
+}

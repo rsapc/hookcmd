@@ -108,3 +108,12 @@ type PrimaryI struct {
 	ID      int    `json:"id"`
 	URL     string `json:"url"`
 }
+
+// DeviceVMSearchResults are returned for searches of
+// either devices or virtual machines
+type DeviceVMSearchResults struct {
+	Count    int          `json:"count"`
+	Next     *string      `json:"next"`
+	Previous *string      `json:"previous"`
+	Results  []DeviceOrVM `json:"results"`
+}
