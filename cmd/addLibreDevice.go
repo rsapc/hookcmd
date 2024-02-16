@@ -20,27 +20,28 @@ var addLibreDeviceCmd = &cobra.Command{
 	`,
 	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
+		useHTML, _ := cmd.Flags().GetBool("html")
+		if useHTML {
+			startHTML("Adding %s:%s with IP %s to LibreNMS", args[1], args[2], args[0])
+		}
 		modelID, err := strconv.ParseInt(args[2], 0, 64)
 		if err != nil {
 			log.Fatalf("could not parse modelID: %v", err)
 		}
 
 		if err = svc.AddToLibreNMS(args[0], args[1], modelID); err != nil {
-			log.Fatal(err)
+			if !useHTML {
+				log.Fatal(err)
+			}
+		}
+		if useHTML {
+			endHTML()
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(addLibreDeviceCmd)
+	addLibreDeviceCmd.Flags().BoolP("html", "x", false, "Return response as HTML")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// addLibreDeviceCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// addLibreDeviceCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

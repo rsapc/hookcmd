@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"github.com/rsapc/hookcmd/models"
 	"github.com/rsapc/hookcmd/netbox"
 )
+
+var ErrUnimplemented = errors.New("method has not been implemented")
 
 type Service struct {
 	getenv   func(string) string
@@ -70,17 +73,7 @@ func (s *Service) AddToLibreNMS(addr string, model string, modelID int64) error 
 	if err = s.netbox.AddJournalEntry(model, modelID, netbox.InfoLevel, fmt.Sprintf("added device to LibreNMS.  id=%d", devid)); err != nil {
 		s.logger.Error(fmt.Sprintf("could not add journal entry: %v", err), "service", "service")
 	}
-
-	err = s.netbox.UpdateCustomFieldOnModel(model, modelID, "monitoring_id", devid)
-	if err != nil {
-		s.logger.Error(err.Error())
-		s.netbox.AddJournalEntry(model, modelID, netbox.WarningLevel, fmt.Sprintf("failed to add monitoring_id: %d", devid))
-		return err
-	} else {
-		msg := fmt.Sprintf("added monitoring_id %d to %s %d", devid, model, modelID)
-		s.netbox.AddJournalEntry(model, modelID, netbox.SuccessLevel, msg)
-	}
-	return nil
+	return s.netbox.SetMonitoringID(model, modelID, devid)
 }
 
 // DeviceDown will set the device status in Netbox based on the
@@ -128,4 +121,101 @@ func (s *Service) DeviceDown(payload string) error {
 		return s.netbox.AddJournalEntry(objectType, objectID, netbox.SuccessLevel, journalEntry)
 	}
 	return nil
+}
+
+func (s *Service) GetDeviceInfo(deviceID int) error {
+	netboxType, netboxID, err := s.netbox.FindMonitoredObject(deviceID)
+	if err != nil {
+		s.logger.Error("could not find netbox device", "device_id", deviceID, "err", err)
+		return err
+	}
+	device, err := s.librenms.GetDevice(deviceID)
+	if err != nil {
+		return err
+	}
+	return s.updateDeviceInfo(device, netboxType, netboxID)
+}
+
+// updateDeviceInfo takes a Device object from LibreNMS and updates the corresponding
+// fields in Netbox.  It will also make Journal Entries in Netbox with what has been
+// done.
+func (s *Service) updateDeviceInfo(device librenms.LibreDevice, netboxType string, netboxID int64) error {
+	nbdev, err := s.netbox.GetDeviceOrVMbyType(netboxType, netboxID)
+	if err != nil {
+		return err
+	}
+	data, err := s.updateNetboxDevice(device, nbdev)
+	if err != nil {
+		s.netbox.AddJournalEntry(netboxType, netboxID, netbox.WarningLevel, "could not update device:\n\n%s", err.Error())
+		return err
+	}
+	s.netbox.AddJournalEntry(netboxType, netboxID, netbox.SuccessLevel, "device updated with values from LibreNMS\n\nUpdate Data:\n%s", data)
+	s.logger.Info("successfully updated device from LibreNMS", "deviceType", netboxType, "ID", netboxID)
+	return nil
+}
+
+func (s *Service) updateNetboxDevice(device librenms.LibreDevice, nbdev netbox.DeviceOrVM) (string, error) {
+	cf := make(map[string]interface{})
+	data := make(map[string]interface{})
+	if nbdev.CustomFields.MonitoringID == nil {
+		cf["monitoring_id"] = device.DeviceID
+		data["custom_fields"] = cf
+	}
+
+	if nbdev.Description == "" {
+		var description *string
+		if device.SysDescr != nil {
+			description = device.SysDescr
+		}
+		if device.Purpose != nil {
+			description = device.Purpose
+		} else if device.Hardware != nil {
+			description = device.Hardware
+		}
+		if description != nil {
+			data["description"] = *description
+		}
+	}
+
+	if device.Serial != nil && *device.Serial != "" {
+		data["serial"] = *device.Serial
+	}
+
+	if device.Lat != nil {
+		data["latitude"] = *device.Lat
+	}
+	if device.Lng != nil {
+		data["longitude"] = *device.Lng
+	}
+
+	d, _ := json.Marshal(data)
+	return string(d), s.netbox.UpdateObjectByURL(nbdev.URL, data)
+}
+
+// FindDevice searches for a device by IP
+func (s *Service) FindDevice(addr string) error {
+	ip := netbox.IPfromCIDR(addr)
+	ipInfo, err := s.netbox.SearchIP(ip)
+	if err != nil {
+		return err
+	}
+	if ipInfo.Count != 1 {
+		s.logger.Error(fmt.Sprintf("invalid number of netbox IPs found: %d", ipInfo.Count))
+		return fmt.Errorf("invalid netbox device count: %d", ipInfo.Count)
+	}
+	device, err := s.librenms.GetDeviceByIP(ip)
+	if err != nil {
+		return err
+	}
+	nbdev, err := s.netbox.GetDeviceOrVM(ipInfo.Results[0].URL)
+	if err != nil {
+		return err
+	}
+	_, err = s.updateNetboxDevice(device, nbdev)
+	if err != nil {
+		errMsg := fmt.Sprintf("could not update Netbox device: %v", err)
+		s.logger.Error(errMsg, "url", nbdev.URL)
+		return err
+	}
+	return err
 }

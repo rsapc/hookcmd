@@ -228,8 +228,9 @@ func (c *Client) buildRequest() *resty.Request {
 	return c.client.NewRequest().SetAuthScheme("Token").SetAuthToken(c.token)
 }
 
-func (c *Client) buildURL(path string) string {
-	return fmt.Sprintf("%s/api%s", c.baseURL, path)
+func (c *Client) buildURL(path string, args ...any) string {
+	urlPath := fmt.Sprintf(path, args...)
+	return fmt.Sprintf("%s/api%s", c.baseURL, urlPath)
 }
 
 func checkStatus(resp *resty.Response) error {
@@ -239,17 +240,26 @@ func checkStatus(resp *resty.Response) error {
 	return nil
 }
 
-func (c *Client) SetIPDNS(ip string, dns string) error {
+func (c *Client) SearchIP(ip string) (*IPSearchResults, error) {
 	obj := &IPSearchResults{}
 	r := c.buildRequest().SetResult(obj)
 	url := fmt.Sprintf("%s/?address=%s", c.buildURL(ipPath), ip)
 	resp, err := r.Get(url)
 	if err != nil {
 		c.log.Error("Could not find address", "err", err)
-		return err
+		return obj, err
 	}
 	if err = checkStatus(resp); err != nil {
 		c.log.Error("Error returned by netbox", "err", err)
+		return obj, err
+	}
+	return obj, err
+}
+
+func (c *Client) SetIPDNS(ip string, dns string) error {
+	obj, err := c.SearchIP(ip)
+	if err != nil {
+		c.log.Error("Could not find address", "err", err)
 		return err
 	}
 	for _, addr := range obj.Results {
@@ -306,48 +316,79 @@ func (c *Client) checkSite(param string, name string) (found bool, id int) {
 
 // FindMonitoredObject searches for the device or VM that has the requested monitoring_id custom field.
 func (c *Client) FindMonitoredObject(monitoringID int) (objectType string, objectID int64, err error) {
-	id, err := c.FindMonitoredDevice(monitoringID)
+	obj, err := c.FindMonitoredDevice(monitoringID)
 	if err != nil {
 		if !errors.Is(err, ErrNotFound) {
 			return "device", -1, err
 		}
 	} else {
-		return "device", id, nil
+		return "device", obj.ID, nil
 	}
-	id, err = c.FindMonitoredVM(monitoringID)
-	return "virtualmachine", id, err
+	obj, err = c.FindMonitoredVM(monitoringID)
+	return "virtualmachine", obj.ID, err
 }
 
 // FindMonitoredDevice searches devices for the given monitoring_id custom field
-func (c *Client) FindMonitoredDevice(monitoringID int) (objectID int64, err error) {
-	return c.searchMonitoredID(monitoringID, GetPathForModel("device"))
+func (c *Client) FindMonitoredDevice(monitoringID int) (object MonitoredObject, err error) {
+	return c.searchMonitoredID(monitoringID, "device")
 }
 
 // FindMonitoredVM searches virtual machines for the given monitoring_id custom field
-func (c *Client) FindMonitoredVM(monitoringID int) (objectID int64, err error) {
-	return c.searchMonitoredID(monitoringID, GetPathForModel("virtualmachine"))
+func (c *Client) FindMonitoredVM(monitoringID int) (object MonitoredObject, err error) {
+	return c.searchMonitoredID(monitoringID, "virtualmachine")
 }
 
-func (c *Client) searchMonitoredID(monitoringID int, path string) (objectID int64, err error) {
+func (c *Client) searchMonitoredID(monitoringID int, objectType string) (object MonitoredObject, err error) {
+	path := GetPathForModel(objectType)
 	obj := &MonitoringSearchResults{}
 	r := c.buildRequest().SetResult(obj)
 	url := c.buildURL(fmt.Sprintf("%s/?cf_monitoring_id=%d", path, monitoringID))
 	resp, err := r.Get(url)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("error searching %s", r.URL), "err", err)
-		return objectID, err
+		return object, err
 	}
 	if resp.IsError() {
 		c.log.Error(fmt.Sprintf("%d searching %s", resp.StatusCode(), r.URL), "err", err)
-		return objectID, err
+		return object, err
 	}
 	if obj.Count == 0 {
-		return objectID, ErrNotFound
+		return object, ErrNotFound
 	}
 	if obj.Count > 1 {
-		return objectID, fmt.Errorf("too many objects found: %d", obj.Count)
+		return object, fmt.Errorf("too many objects found: %d", obj.Count)
 	}
-	return obj.Results[0].ID, nil
+	object = obj.Results[0]
+	object.ObjectType = objectType
+	return object, nil
+}
+
+// GetDeviceOrVMbyType will return a map representing the object provided by objectType and objectID
+func (c *Client) GetDeviceOrVMbyType(objectType string, objectID int64) (obj DeviceOrVM, err error) {
+	path := GetPathForModel(objectType)
+	if path == "" {
+		c.log.Error("could not determine the path for model %s", objectType)
+		return obj, fmt.Errorf("could not determine the path for model %s", objectType)
+	}
+	url := c.buildURL(path+"/%d/", objectID)
+	return c.GetDeviceOrVM(url)
+}
+
+// GetObject returns a map representing a Netbox Object, retrieved from
+// the given URL
+func (c *Client) GetDeviceOrVM(url string) (DeviceOrVM, error) {
+	obj := DeviceOrVM{}
+	r := c.buildRequest().SetResult(&obj)
+	resp, err := r.Get(url)
+	if err != nil {
+		c.log.Error(fmt.Sprintf("error searching %s", r.URL), "err", err)
+		return obj, err
+	}
+	if resp.IsError() {
+		c.log.Error(fmt.Sprintf("%d searching %s", resp.StatusCode(), r.URL), "err", err)
+		return obj, err
+	}
+	return obj, err
 }
 
 func (c *Client) AddSite(row map[string]string) error {
@@ -403,6 +444,20 @@ func (c *Client) AddSite(row map[string]string) error {
 	return err
 }
 
+// SetMonitoringID sets the monitoring_id custom field on the given object/id
+func (c *Client) SetMonitoringID(model string, modelID int64, devid int) error {
+	err := c.UpdateCustomFieldOnModel(model, modelID, "monitoring_id", devid)
+	if err != nil {
+		c.log.Error(err.Error())
+		c.AddJournalEntry(model, modelID, WarningLevel, fmt.Sprintf("failed to add monitoring_id: %d", devid))
+		return err
+	} else {
+		msg := fmt.Sprintf("added monitoring_id %d to %s %d", devid, model, modelID)
+		c.AddJournalEntry(model, modelID, SuccessLevel, msg)
+	}
+	return err
+}
+
 func (c *Client) UpdateCustomFieldOnModel(model string, modelID int64, field string, value any) error {
 	cf := make(map[string]interface{})
 	data := make(map[string]interface{})
@@ -420,12 +475,15 @@ func (c *Client) UpdateObject(model string, modelID int64, payload map[string]in
 		return fmt.Errorf("could not determine the path for model %s", model)
 	}
 	path = fmt.Sprintf("%s/%d/", path, modelID)
+	return c.UpdateObjectByURL(c.buildURL(path), payload)
+}
 
-	c.log.Debug(fmt.Sprintf("Updating %s %d", model, modelID))
+func (c *Client) UpdateObjectByURL(url string, payload map[string]interface{}) error {
+	c.log.Debug(fmt.Sprintf("Updating %s", url))
 	obj := make(map[string]interface{})
 	r := c.buildRequest().SetResult(&obj)
 	r.SetBody(payload)
-	resp, err := r.Patch(c.buildURL(path))
+	resp, err := r.Patch(url)
 	if err != nil {
 		c.log.Warn(err.Error())
 		return err
@@ -601,11 +659,11 @@ func (c *Client) addTag(name string, slug string) {
 }
 
 // AddJournalEntry adds a new journal entry to a location
-func (c *Client) AddJournalEntry(model string, modelID int64, level JournalLevel, comments string) error {
+func (c *Client) AddJournalEntry(model string, modelID int64, level JournalLevel, comments string, args ...any) error {
 	data := make(map[string]interface{})
 	data["assigned_object_type"] = getObjectType(model)
 	data["assigned_object_id"] = modelID
-	data["comments"] = comments
+	data["comments"] = fmt.Sprintf(comments, args...)
 	levelStr := getJournalLevel(level)
 	if levelStr != "" {
 		data["kind"] = levelStr

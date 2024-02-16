@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/rsapc/hookcmd/service"
@@ -37,4 +38,25 @@ func init() {
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.webhooks.yaml)")
 
 	svc = service.NewService(os.Getenv, nil)
+}
+
+func startHTML(title string, args ...any) {
+	htmlTitle := fmt.Sprintf(title, args...)
+	fmt.Printf(`<html>
+	<body>
+		<h1>%s</h1>
+		<pre>
+	`, htmlTitle)
+}
+
+func endHTML() {
+	fmt.Print(`
+	</pre><br/><br/>
+	<p>
+	<button onclick="history.back()">Go Back</button>
+	</p>
+</body>
+</html>
+`)
+
 }
