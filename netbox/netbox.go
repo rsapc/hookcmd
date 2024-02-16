@@ -243,7 +243,7 @@ func checkStatus(resp *resty.Response) error {
 func (c *Client) SearchIP(ip string) (*IPSearchResults, error) {
 	obj := &IPSearchResults{}
 	r := c.buildRequest().SetResult(obj)
-	url := fmt.Sprintf("%s/?address=%s", c.buildURL(ipPath), ip)
+	url := fmt.Sprintf("%s?address=%s", c.buildURL(ipPath), ip)
 	resp, err := r.Get(url)
 	if err != nil {
 		c.log.Error("Could not find address", "err", err)
