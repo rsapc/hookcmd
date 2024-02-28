@@ -42,6 +42,8 @@ func GetInterfaceTypeFromIfType(ifType string) string {
 	return nbType
 }
 
+// GetUpdatedInterface compares a Netbox interface to a libreNMS port.  If there are changes the
+// edit interface for Netbox is returned along with true to indicate changes should be made.
 func GetUpdatedInterface(intf netbox.Interface, port librenms.Port) (*netbox.InterfaceEdit, bool) {
 	update := false
 	ifUpd := &netbox.InterfaceEdit{Device: &intf.Device.ID}

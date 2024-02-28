@@ -34,6 +34,8 @@ type MonitoringSearchResults struct {
 func getObjectType(aModel string) string {
 	var group string
 	switch aModel {
+	case "interface":
+		fallthrough
 	case "location":
 		fallthrough
 	case "device":

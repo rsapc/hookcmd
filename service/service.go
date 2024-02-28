@@ -291,13 +291,14 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 				body, _ := json.Marshal(ifUpd)
 				if err = s.netbox.UpdateInterface(int64(intf.ID), *ifUpd); err != nil {
 					s.logger.Error("failed to update interface", "device", netboxDevice, "interface", port.IfName, "error", err)
-					s.netbox.AddJournalEntry("device", int64(netboxDevice), netbox.InfoLevel, "failed to update interface %s: %v\n\n```json%s\n```", port.IfName, err, string(body))
+					s.netbox.AddJournalEntry("interface", int64(intf.ID), netbox.InfoLevel, "failed to update interface %s: %v\n\n```json%s\n```", port.IfName, err, string(body))
 				} else {
-					s.netbox.AddJournalEntry("device", int64(netboxDevice), netbox.SuccessLevel, "updated interface: %s\n\n```json\n%s\n```", port.IfName, string(body))
+					s.netbox.AddJournalEntry("interface", int64(intf.ID), netbox.SuccessLevel, "updated interface: [%s](/dcim/interfaces/%d)\n\n```json\n%s\n```", port.IfName, intf.ID, string(body))
 				}
 			}
 		} else {
 			ifUpd.Description = port.IfAlias
+			// TODO: Parse the interface name to determine VLAN interfaces and override the type
 			ifType := GetInterfaceTypeFromIfType(port.IfType)
 			ifUpd.Type = &ifType
 			ifUpd.SetDuplex(port.IfDuplex)
