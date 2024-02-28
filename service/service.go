@@ -298,9 +298,13 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 			}
 		} else {
 			ifUpd.Description = port.IfAlias
-			// TODO: Parse the interface name to determine VLAN interfaces and override the type
-			ifType := GetInterfaceTypeFromIfType(port.IfType)
+			ifType, parent := GetInterfaceTypeFromIfType(port.IfType, port.IfName)
 			ifUpd.Type = &ifType
+			if parent != "" {
+				if pIntf, ok := nbInts[parent]; ok {
+					ifUpd.SetParent(pIntf.ID)
+				}
+			}
 			ifUpd.SetDuplex(port.IfDuplex)
 			if port.IfSpeed != nil {
 				ifUpd.SetSpeed(*port.IfSpeed / 1000)

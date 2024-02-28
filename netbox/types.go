@@ -237,6 +237,7 @@ type InterfaceEdit struct {
 	Name        *string     `json:"name,omitempty"`
 	Speed       *int        `json:"speed,omitempty"`
 	Type        *string     `json:"type,omitempty"`
+	Parent      *int        `json:"parent,omitempty"`
 }
 
 // SetSpeed sets the speed to update.  Returns true
@@ -277,4 +278,12 @@ func (i *InterfaceEdit) SetMac(mac *string) bool {
 func (i *InterfaceEdit) SetName(name string) bool {
 	i.Name = &name
 	return true
+}
+
+func (i *InterfaceEdit) SetParent(parent int) bool {
+	if parent != 0 {
+		i.Parent = &parent
+		return true
+	}
+	return false
 }

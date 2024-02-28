@@ -1,14 +1,22 @@
 package service
 
 import (
+	"regexp"
+
 	"github.com/rsapc/hookcmd/librenms"
 	"github.com/rsapc/hookcmd/netbox"
 )
 
+var ifRegex = regexp.MustCompile(`^(?P<intf>[^\. ]+)\.?(?P<vlan>\d+)?`)
+var parentIdx = ifRegex.SubexpIndex("intf")
+var vlanIdx = ifRegex.SubexpIndex("intf")
+
 // GetINterfaceTypeFromIfType takes an SNMP ifType value
 // and returns a corresponding Netbox interface type (or
 // an approximate equivalent)
-func GetInterfaceTypeFromIfType(ifType string) string {
+//
+// If typ is virtual the parent interface will be returned if it can be determined
+func GetInterfaceTypeFromIfType(ifType string, ifName string) (typ string, parent string) {
 	var nbType string
 	switch ifType {
 	case "ethernetCsmacd":
@@ -39,7 +47,15 @@ func GetInterfaceTypeFromIfType(ifType string) string {
 	default:
 		nbType = "other"
 	}
-	return nbType
+
+	if ifRegex.MatchString(ifName) {
+		matches := ifRegex.FindStringSubmatch(ifName)
+		if matches[vlanIdx] != "" {
+			parent = matches[parentIdx]
+			nbType = "virtual"
+		}
+	}
+	return nbType, parent
 }
 
 // GetUpdatedInterface compares a Netbox interface to a libreNMS port.  If there are changes the
