@@ -309,7 +309,7 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 			if port.IfSpeed != nil {
 				ifUpd.SetSpeed(*port.IfSpeed / 1000)
 			}
-			ifUpd.SetMac(port.IfPhysAddress)
+			ifUpd.SetMac(port.GetPhysAddress())
 			body, _ := json.Marshal(ifUpd)
 			if err = s.netbox.AddInterface(int64(netboxDevice), *ifUpd); err != nil {
 				s.logger.Error("failed to add interface", "device", netboxDevice, "interface", port.IfName, "error", err)

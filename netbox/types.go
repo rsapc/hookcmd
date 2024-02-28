@@ -147,7 +147,7 @@ type Interface struct {
 	Description      string        `json:"description"`
 	Device           DisplayIDName `json:"device"`
 	Display          string        `json:"display"`
-	Duplex           *string       `json:"duplex"`
+	Duplex           *LabelValue   `json:"duplex"`
 	Enabled          bool          `json:"enabled"`
 	ID               int           `json:"id"`
 	L2vpnTermination interface{}   `json:"l2vpn_termination"`
@@ -207,7 +207,7 @@ func (i *Interface) GetDuplex() string {
 	if i.Duplex == nil {
 		return "auto"
 	}
-	return *i.Duplex
+	return i.Duplex.Value
 }
 
 func (i *Interface) GetMacAddress() string {
@@ -256,6 +256,9 @@ func (i *InterfaceEdit) SetDuplex(duplex *string) bool {
 	if duplex == nil {
 		return false
 	}
+	if *duplex == "unknown" {
+		return false
+	}
 	if strings.HasPrefix(*duplex, "full") {
 		newDuplex = "full"
 	}
@@ -267,11 +270,8 @@ func (i *InterfaceEdit) SetDuplex(duplex *string) bool {
 	return true
 }
 
-func (i *InterfaceEdit) SetMac(mac *string) bool {
-	if mac == nil {
-		return false
-	}
-	i.MacAddress = mac
+func (i *InterfaceEdit) SetMac(mac string) bool {
+	i.MacAddress = &mac
 	return true
 }
 

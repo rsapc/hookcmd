@@ -9,7 +9,7 @@ import (
 
 var ifRegex = regexp.MustCompile(`^(?P<intf>[^\. ]+)\.?(?P<vlan>\d+)?`)
 var parentIdx = ifRegex.SubexpIndex("intf")
-var vlanIdx = ifRegex.SubexpIndex("intf")
+var vlanIdx = ifRegex.SubexpIndex("vlan")
 
 // GetINterfaceTypeFromIfType takes an SNMP ifType value
 // and returns a corresponding Netbox interface type (or
@@ -68,13 +68,15 @@ func GetUpdatedInterface(intf netbox.Interface, port librenms.Port) (*netbox.Int
 		update = true
 	}
 	if intf.GetSpeed() != port.GetSpeed()/1000 {
-		update = update || ifUpd.SetSpeed(port.GetSpeed()/1000)
+		update = ifUpd.SetSpeed(port.GetSpeed()/1000) || update
 	}
 	if intf.GetDuplex() != port.GetDuplex() {
-		update = update || ifUpd.SetDuplex(port.IfDuplex)
+		update = ifUpd.SetDuplex(port.IfDuplex) || update
 	}
-	if intf.GetMacAddress() != port.GetPhysAddress() {
-		update = update || ifUpd.SetMac(port.IfPhysAddress)
+	portAddr := port.GetPhysAddress()
+	intfAddr := intf.GetMacAddress()
+	if intfAddr != portAddr {
+		update = ifUpd.SetMac(portAddr) || update
 	}
 
 	return ifUpd, update
