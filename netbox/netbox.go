@@ -16,6 +16,7 @@ import (
 )
 
 var ErrNotFound = errors.New("the requested object was not found")
+var ErrNotImplemented = errors.New("not implemented")
 
 const region = 12
 

@@ -1,6 +1,9 @@
 package netbox
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type JournalLevel int
 
@@ -116,4 +119,160 @@ type DeviceVMSearchResults struct {
 	Next     *string      `json:"next"`
 	Previous *string      `json:"previous"`
 	Results  []DeviceOrVM `json:"results"`
+}
+
+type Interface struct {
+	Bridge interface{} `json:"bridge"`
+	Cable  *struct {
+		Display string `json:"display"`
+		ID      int    `json:"id"`
+		Label   string `json:"label"`
+		URL     string `json:"url"`
+	} `json:"cable"`
+	CableEnd                    string      `json:"cable_end"`
+	ConnectedEndpoints          interface{} `json:"connected_endpoints"`
+	ConnectedEndpointsReachable *bool       `json:"connected_endpoints_reachable"`
+	ConnectedEndpointsType      interface{} `json:"connected_endpoints_type"`
+	CountFhrpGroups             int         `json:"count_fhrp_groups"`
+	CountIpaddresses            int         `json:"count_ipaddresses"`
+	Created                     string      `json:"created"`
+	CustomFields                struct {
+		ChannelFreq  interface{} `json:"channel_freq"`
+		ChannelWidth interface{} `json:"channel_width"`
+		Ssid         interface{} `json:"ssid"`
+		WirelessRole interface{} `json:"wireless_role"`
+	} `json:"custom_fields"`
+	Description      string        `json:"description"`
+	Device           DisplayIDName `json:"device"`
+	Display          string        `json:"display"`
+	Duplex           *string       `json:"duplex"`
+	Enabled          bool          `json:"enabled"`
+	ID               int           `json:"id"`
+	L2vpnTermination interface{}   `json:"l2vpn_termination"`
+	Label            string        `json:"label"`
+	Lag              interface{}   `json:"lag"`
+	LastUpdated      string        `json:"last_updated"`
+	LinkPeers        []struct {
+		Cable    int           `json:"cable"`
+		Device   DisplayIDName `json:"device"`
+		Display  string        `json:"display"`
+		ID       int           `json:"id"`
+		Name     string        `json:"name"`
+		Occupied bool          `json:"_occupied"`
+		URL      string        `json:"url"`
+	} `json:"link_peers"`
+	LinkPeersType      *string       `json:"link_peers_type"`
+	MacAddress         *string       `json:"mac_address"`
+	MarkConnected      bool          `json:"mark_connected"`
+	MgmtOnly           bool          `json:"mgmt_only"`
+	Mode               interface{}   `json:"mode"`
+	Module             interface{}   `json:"module"`
+	Mtu                interface{}   `json:"mtu"`
+	Name               string        `json:"name"`
+	Occupied           bool          `json:"_occupied"`
+	Parent             interface{}   `json:"parent"`
+	PoeMode            interface{}   `json:"poe_mode"`
+	PoeType            interface{}   `json:"poe_type"`
+	RfChannel          interface{}   `json:"rf_channel"`
+	RfChannelFrequency interface{}   `json:"rf_channel_frequency"`
+	RfChannelWidth     interface{}   `json:"rf_channel_width"`
+	RfRole             interface{}   `json:"rf_role"`
+	Speed              *int          `json:"speed"`
+	TaggedVlans        []interface{} `json:"tagged_vlans"`
+	Tags               []interface{} `json:"tags"`
+	TxPower            interface{}   `json:"tx_power"`
+	Type               struct {
+		Label string `json:"label"`
+		Value string `json:"value"`
+	} `json:"type"`
+	URL          string        `json:"url"`
+	UntaggedVlan interface{}   `json:"untagged_vlan"`
+	Vdcs         []interface{} `json:"vdcs"`
+	Vrf          interface{}   `json:"vrf"`
+	WirelessLans []interface{} `json:"wireless_lans"`
+	WirelessLink interface{}   `json:"wireless_link"`
+	Wwn          interface{}   `json:"wwn"`
+}
+
+func (i *Interface) GetSpeed() int {
+	if i.Speed == nil {
+		return 0
+	}
+	return *i.Speed
+}
+
+func (i *Interface) GetDuplex() string {
+	if i.Duplex == nil {
+		return "auto"
+	}
+	return *i.Duplex
+}
+
+func (i *Interface) GetMacAddress() string {
+	var mac string
+	if i.MacAddress != nil {
+		mac = *i.MacAddress
+	}
+	return mac
+}
+
+type InterfacesResponse struct {
+	Count    int         `json:"count"`
+	Next     *string     `json:"next"`
+	Previous *string     `json:"previous"`
+	Results  []Interface `json:"results"`
+}
+
+// InterfaceEdit is used to add/update an interface
+type InterfaceEdit struct {
+	Description string      `json:"description,omitempty"`
+	Device      *int        `json:"device,omitempty"`
+	Display     *string     `json:"display,omitempty"`
+	Duplex      *string     `json:"duplex,omitempty"`
+	Label       *string     `json:"label,omitempty"`
+	Lag         interface{} `json:"lag,omitempty"`
+	MacAddress  *string     `json:"mac_address,omitempty"`
+	Name        *string     `json:"name,omitempty"`
+	Speed       *int        `json:"speed,omitempty"`
+	Type        *string     `json:"type,omitempty"`
+}
+
+// SetSpeed sets the speed to update.  Returns true
+// if the value is changed
+func (i *InterfaceEdit) SetSpeed(speed int) bool {
+	if speed == 0 {
+		return false
+	}
+	i.Speed = &speed
+	return true
+}
+
+func (i *InterfaceEdit) SetDuplex(duplex *string) bool {
+	newDuplex := "auto"
+
+	if duplex == nil {
+		return false
+	}
+	if strings.HasPrefix(*duplex, "full") {
+		newDuplex = "full"
+	}
+	if strings.HasPrefix(*duplex, "half") {
+		newDuplex = "half"
+	}
+
+	i.Duplex = &newDuplex
+	return true
+}
+
+func (i *InterfaceEdit) SetMac(mac *string) bool {
+	if mac == nil {
+		return false
+	}
+	i.MacAddress = mac
+	return true
+}
+
+func (i *InterfaceEdit) SetName(name string) bool {
+	i.Name = &name
+	return true
 }

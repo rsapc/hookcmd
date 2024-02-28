@@ -13,6 +13,8 @@ import (
 
 var ErrNotFound = errors.New("the request object was not found")
 
+const portColumns = "columns=device_id,ifName,ifType,ifAlias,ifDescr,portName,ifOperStatus,ifPhysAddress,ifVlan,ifTrunk,ifSpeed,ifDuplex"
+
 type Client struct {
 	client  *resty.Client
 	log     models.Logger
@@ -168,6 +170,35 @@ func (c *Client) LoadIPs() error {
 		c.mux.Unlock()
 	}
 	return nil
+}
+
+// GetPortsForDevice returns all of the ports for the given device.
+// If the number of ports returned is zero an ErrNotFound is returned
+func (c *Client) GetPortsForDevice(id int) (ports []Port, err error) {
+	obj := &PortSearchResponse{}
+	r := c.buildRequest().SetResult(obj)
+	resp, err := r.Get(c.buildURL("/ports/search/device_id/%d?%s", id, portColumns))
+	if err != nil {
+		c.log.Error("error getting ports", "url", r.URL, "err", err)
+		return ports, err
+	}
+	if resp.IsError() {
+		if resp.StatusCode() == 404 {
+			return ports, ErrNotFound
+		}
+		errObj, _ := GetLibreError(resp)
+		c.log.Error("error status returned", "url", r.URL, "err", errObj.Message)
+		return ports, fmt.Errorf("error status returned %d: %s", resp.StatusCode(), errObj.Message)
+	}
+	for _, port := range obj.Ports {
+		if port.DeviceID == id {
+			ports = append(ports, port)
+		}
+	}
+	if len(ports) == 0 {
+		return ports, ErrNotFound
+	}
+	return ports, nil
 }
 
 func (c *Client) FindPortForIP(ip string) (port Port, err error) {

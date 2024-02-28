@@ -125,6 +125,9 @@ type Port struct {
 	IfSpeed            *int    `json:"ifSpeed"`
 	IfSpeedPrev        int     `json:"ifSpeed_prev"`
 	IfType             string  `json:"ifType"`
+	IfPhysAddress      *string `json:"ifPhysAddress"`
+	IfVlan             *string `json:"ifVlan"`
+	IfTrunk            *string `json:"ifTrunk"`
 	PortDescrCircuit   *string `json:"port_descr_circuit"`
 	PortDescrDescr     *string `json:"port_descr_descr"`
 	PortDescrNotes     *string `json:"port_descr_notes"`
@@ -134,9 +137,36 @@ type Port struct {
 	PortName           *string `json:"portName"`
 }
 
+func (p Port) GetSpeed() int {
+	if p.IfSpeed == nil {
+		return 0
+	}
+	return *p.IfSpeed
+}
+
+func (p Port) GetPhysAddress() string {
+	var mac string
+	if p.IfPhysAddress != nil {
+		mac = *p.IfPhysAddress
+	}
+	return mac
+}
+
+func (p Port) GetDuplex() string {
+	if p.IfDuplex == nil {
+		return "auto"
+	}
+	return *p.IfDuplex
+}
+
 // PortResponse is returned when querying for a given port
 type PortResponse struct {
 	Count  int    `json:"count"`
 	Ports  []Port `json:"port"`
+	Status string `json:"status"`
+}
+
+type PortSearchResponse struct {
+	Ports  []Port `json:"ports"`
 	Status string `json:"status"`
 }

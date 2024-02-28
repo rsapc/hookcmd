@@ -12,6 +12,8 @@ func GetPathForModel(model string) string {
 	path := ""
 
 	switch model {
+	case "interface":
+		path = "/dcim/interfaces"
 	case "device":
 		path = "/dcim/devices"
 	case "ipaddress":
