@@ -287,6 +287,14 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 		if intf, ok := nbInts[port.IfName]; ok {
 			update := false
 			ifUpd, update = GetUpdatedInterface(intf, port)
+			ifType, parent := GetInterfaceTypeFromIfType(port.IfType, port.IfName)
+			if intf.Parent == nil && parent != "" {
+				if pIntf, ok := nbInts[parent]; ok {
+					ifUpd.Type = &ifType
+					ifUpd.SetParent(pIntf.ID)
+					update = true
+				}
+			}
 			if update {
 				body, _ := json.Marshal(ifUpd)
 				if err = s.netbox.UpdateInterface(int64(intf.ID), *ifUpd); err != nil {
