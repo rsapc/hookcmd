@@ -1,5 +1,7 @@
 package librenms
 
+import "strings"
+
 const (
 	AlertFiring  = 1
 	AlertCleared = 0
@@ -149,7 +151,10 @@ func (p Port) GetPhysAddress() string {
 	if p.IfPhysAddress != nil {
 		mac = *p.IfPhysAddress
 	}
-	return mac
+	if len(mac) == 12 {
+		mac = mac[0:2] + ":" + mac[2:4] + ":" + mac[4:6] + ":" + mac[6:8] + ":" + mac[8:10] + ":" + mac[10:12]
+	}
+	return strings.ToUpper(mac)
 }
 
 func (p Port) GetDuplex() string {
