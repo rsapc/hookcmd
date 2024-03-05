@@ -4,7 +4,7 @@ import (
 	"regexp"
 
 	"github.com/rsapc/hookcmd/librenms"
-	"github.com/rsapc/hookcmd/netbox"
+	"github.com/rsapc/netbox"
 )
 
 var ifRegex = regexp.MustCompile(`^(?P<intf>[^\. ]+)\.?(?P<vlan>\d+)?`)

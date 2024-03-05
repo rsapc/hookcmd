@@ -12,18 +12,18 @@ import (
 
 // updatePortsCmd represents the updatePorts command
 var updatePortsCmd = &cobra.Command{
-	Use:   "updatePorts {netbox ID} {libreNMS ID}",
+	Use:   "updatePorts {netbox DeviceType} {netbox ID} {libreNMS ID}",
 	Short: "Updates the Netbox port descriptions from LibreNMS",
 	Long: `Updates the interface descriptions on the Netbox device ID
 	to match what is in LibreNMS device
 	`,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
-		nbID, err := strconv.ParseInt(args[0], 0, 0)
+		nbID, err := strconv.ParseInt(args[1], 0, 0)
 		if err != nil {
 			log.Fatalf("could not parse netbox device ID: %v", err)
 		}
-		libreID, err := strconv.ParseInt(args[1], 0, 0)
+		libreID, err := strconv.ParseInt(args[2], 0, 0)
 		if err != nil {
 			log.Fatalf("could not parse monitoring ID: %v", err)
 		}
@@ -31,7 +31,7 @@ var updatePortsCmd = &cobra.Command{
 		if useHTML {
 			startHTML("Updating from LibreNMS device %v", nbID)
 		}
-		svc.UpdatePortDescriptions(int(nbID), int(libreID))
+		svc.UpdatePortDescriptions(args[0], int(nbID), int(libreID))
 		if useHTML {
 			endHTML()
 		}

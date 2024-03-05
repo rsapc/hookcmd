@@ -12,7 +12,7 @@ import (
 
 	"github.com/rsapc/hookcmd/librenms"
 	"github.com/rsapc/hookcmd/models"
-	"github.com/rsapc/hookcmd/netbox"
+	"github.com/rsapc/netbox"
 )
 
 var ErrUnimplemented = errors.New("method has not been implemented")
@@ -139,7 +139,7 @@ func (s *Service) GetDeviceInfo(deviceID int) error {
 		s.logger.Error("could not update device", "device_id", deviceID, "error", err)
 		return err
 	} else {
-		return s.UpdatePortDescriptions(int(netboxID), deviceID)
+		return s.UpdatePortDescriptions(netboxType, int(netboxID), deviceID)
 	}
 }
 
@@ -158,7 +158,7 @@ func (s *Service) updateDeviceInfo(device librenms.LibreDevice, netboxType strin
 	}
 	s.netbox.AddJournalEntry(netboxType, netboxID, netbox.SuccessLevel, "device updated with values from LibreNMS\n\nUpdate Data:\n%s", data)
 	s.logger.Info("successfully updated device from LibreNMS", "deviceType", netboxType, "ID", netboxID)
-	return s.UpdatePortDescriptions(nbdev.ID, device.DeviceID)
+	return s.UpdatePortDescriptions(netboxType, nbdev.ID, device.DeviceID)
 }
 
 func (s *Service) updateNetboxDevice(device librenms.LibreDevice, nbdev netbox.DeviceOrVM) (string, error) {
@@ -260,7 +260,7 @@ func (s *Service) MissingFromLibre(out io.Writer) error {
 // UpdatePortDescriptions updates the interface descriptions in
 // Netbox from the description in LibreNMS.  Missing interfaces
 // will be added to Netbox.
-func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) error {
+func (s *Service) UpdatePortDescriptions(netboxType string, netboxDevice int, libreDevice int) error {
 	ports, err := s.librenms.GetPortsForDevice(libreDevice)
 	if err != nil {
 		if errors.Is(err, librenms.ErrNotFound) {
@@ -270,7 +270,7 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 		s.logger.Error("error getting ports for device", "device", libreDevice, "error", err)
 		return err
 	}
-	intfs, err := s.netbox.GetInterfacesForDevice(int64(netboxDevice))
+	intfs, err := s.netbox.GetInterfacesForObject(netboxType, int64(netboxDevice))
 	if err != nil {
 		if !errors.Is(netbox.ErrNotFound, err) {
 			s.logger.Error("could not load interfaces from netbox", "error", err)
@@ -297,7 +297,7 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 			}
 			if update {
 				body, _ := json.Marshal(ifUpd)
-				if err = s.netbox.UpdateInterface(int64(intf.ID), *ifUpd); err != nil {
+				if err = s.netbox.UpdateInterface(netboxType, int64(intf.ID), *ifUpd); err != nil {
 					s.logger.Error("failed to update interface", "device", netboxDevice, "interface", port.IfName, "error", err)
 					s.netbox.AddJournalEntry("interface", int64(intf.ID), netbox.InfoLevel, "failed to update interface %s: %v\n\n```json%s\n```", port.IfName, err, string(body))
 				} else {
@@ -319,7 +319,7 @@ func (s *Service) UpdatePortDescriptions(netboxDevice int, libreDevice int) erro
 			}
 			ifUpd.SetMac(port.GetPhysAddress())
 			body, _ := json.Marshal(ifUpd)
-			if err = s.netbox.AddInterface(int64(netboxDevice), *ifUpd); err != nil {
+			if err = s.netbox.AddInterface(netboxType, int64(netboxDevice), *ifUpd); err != nil {
 				s.logger.Error("failed to add interface", "device", netboxDevice, "interface", port.IfName, "error", err)
 				s.netbox.AddJournalEntry("device", int64(netboxDevice), netbox.InfoLevel, "failed to add interface %s: %v\n\n```json\n%s\n```", port.IfName, err, string(body))
 			} else {

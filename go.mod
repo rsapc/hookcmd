@@ -1,6 +1,8 @@
 module github.com/rsapc/hookcmd
 
-go 1.19
+go 1.21
+
+toolchain go1.21.6
 
 require (
 	github.com/go-resty/resty/v2 v2.11.0
@@ -14,6 +16,7 @@ require (
 )
 
 require (
-	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3
+	github.com/rsapc/netbox v0.0.0-20240305171311-1f4bd6a240ad
+	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
 	golang.org/x/net v0.19.0 // indirect
 )
