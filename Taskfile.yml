@@ -1,0 +1,25 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  HOSTS: netbox.ringsq.net netbox.rsapc.net
+  USER: tjd
+
+tasks:
+  build:
+    desc: Build the linux binary
+    sources: 
+      - ./**/*.go
+      - ./*.go
+    generates:
+      - ./hookcmd
+    cmds:
+      - GOOS=linux go build
+    silent: false
+  deploy:
+    desc: Deploy the binary to the Netbox servers
+    cmds:
+      - task: build
+      - for: { var: HOSTS }
+        cmd: scp hookcmd {{.USER}}@{{.ITEM}}:/opt/hooks
